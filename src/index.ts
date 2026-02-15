@@ -25,13 +25,13 @@ program
     ********************************
     * Welcome to the Ask Yogi CLI! *
     ********************************
-  `)
+  `),
   )
   .addHelpText(
     "after",
     chalk.green(`
     Use --question to ask a question or --live-mode to start an infinite question answering loop.
-  `)
+  `),
   );
 
 program
@@ -41,10 +41,7 @@ program
   .option("-h, --help", "Display help for command"); // Added help option
 
 async function run() {
-  const loader = new Loader();
-  loader.start("Initializing Ask Yogi CLI...", "cyan", "white");
   program.parse(process.argv);
-
   const options = program.opts();
 
   if (options.help) {
@@ -53,18 +50,38 @@ async function run() {
   }
 
   const configManager = new ConfigManager();
+
+  // No config and not reconfigure: exit without starting the loader (avoids spinner getting stuck)
+  if (!configManager.isConfigured() && !options.reconfigure) {
+    console.error(
+      chalk.red("Configuration not set. Please run with -r to reconfigure."),
+    );
+    console.error(chalk.gray("  Example: ask-yogi -r"));
+    process.exit(1);
+  }
+
+  const loader = new Loader();
+  loader.start("Initializing Ask Yogi CLI...", "cyan", "white");
+
   const initStatus = await configManager.init();
 
-  if (!initStatus && !options.reconfigure)
+  if (!initStatus && !options.reconfigure) {
+    loader.stop();
     console.error(
-      chalk.cyan("Configuration not initialized. Re-configuring...")
+      chalk.red("Configuration invalid. Please run with -r to reconfigure."),
     );
-  else if (initStatus && options.reconfigure) {
+    console.error(chalk.gray("  Example: ask-yogi -r"));
+    process.exit(1);
+  }
+
+  if (initStatus && options.reconfigure) {
     console.log(chalk.cyan("Reconfiguring Ask Yogi CLI..."));
   }
 
   if (!initStatus || options.reconfigure) {
+    loader.stop();
     await configManager.setup();
+    loader.start("Initializing Ask Yogi CLI...", "cyan", "white");
   }
 
   const config = configManager.getConfig();
@@ -91,7 +108,7 @@ async function run() {
     console.log(chalk.yellow("Type 'exit' to exit live mode."));
 
     console.log(
-      chalk.green("\nYogi says: Welcome! I am here to answer your questions.")
+      chalk.green("\nYogi says: Welcome! I am here to answer your questions."),
     );
 
     process.stdin.on("data", async (data) => {
@@ -106,7 +123,7 @@ async function run() {
         console.log(chalk.green(`Yogi says: ${response.response}`));
         console.log(chalk.green(`Teachings: ${response.teachings.join(", ")}`));
         console.log(
-          chalk.yellow("\nContinue your conversation or type 'exit' to quit:")
+          chalk.yellow("\nContinue your conversation or type 'exit' to quit:"),
         );
       });
     });
